@@ -1,0 +1,135 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - 'web/**'
+      - 'terraform/**' # Terraform ファイルの変更もトリガーに含める
+      - '.github/workflows/deploy.yaml'
+  workflow_dispatch: # 手動実行も可能にする
+
+# 必要な権限を設定 (Workload Identity Federation 用)
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-infra:
+    name: Deploy Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./terraform # Terraform コマンドの実行ディレクトリ
+    env:
+      # Terraform が Cloudflare Provider の認証に使う環境変数
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Terraform 変数に値を渡す (他の変数も必要に応じて TF_VAR_ 接頭辞で追加)
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      # TF_VAR_artifact_registry_repo_id: "kintore-app-backend-repo" # 例: デフォルト値がない場合
+      # TF_VAR_cloud_run_service_name: "kintore-app-backend"
+      # TF_VAR_db_instance_name: "kintore-app-db-instance"
+      # TF_VAR_db_name: "kintore_app"
+      # TF_VAR_db_user_name: "kintore_app_user"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # GCP への認証 (Workload Identity Federation)
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # Terraform のセットアップ
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        # with:
+          # terraform_version: "1.0.0" # 必要に応じてバージョン指定
+
+      # Terraform 初期化
+      # GCS Backend を使う場合はここで認証情報が使われる
+      - name: Terraform Init
+        run: terraform init
+
+      # Terraform 適用
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+  deploy-backend:
+    name: Deploy Backend to Cloud Run
+    needs: deploy-infra # インフラデプロイ完了後に実行
+    runs-on: ubuntu-latest
+    # if: github.ref == 'refs/heads/main' # main ブランチへの push 時のみ実行 (on.push.branches でも指定済)
+    defaults:
+      run:
+        working-directory: ./backend
+    env: # backend デプロイで使う環境変数を再定義 (job間でenvは共有されない)
+      SERVICE_NAME: kintore-app-backend # Cloud Run サービス名 (Terraform変数と合わせる)
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # GCP への認証 (Workload Identity Federation)
+      # secrets.GCP_WORKLOAD_IDENTITY_PROVIDER と secrets.GCP_SERVICE_ACCOUNT が必要
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # Docker イメージのビルドと Artifact Registry へのプッシュ
+      # secrets.GCP_PROJECT_ID, GCP_REGION, GCP_ARTIFACT_REGISTRY_REPO, SERVICE_NAME が必要
+      # Dockerfile が backend ディレクトリにある想定
+      - name: Build and Push Docker image
+        run: |-
+          # gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev # auth@v2 で自動設定されるはず
+          docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest -f Dockerfile ..
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
+        # Dockerfile のコンテキストを一つ上に変更 (-f で Dockerfile を指定し、末尾の . を .. に)
+
+      # Cloud Run へデプロイ
+      # secrets.GCP_PROJECT_ID, GCP_REGION, SERVICE_NAME が必要
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          image: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/${{ env.SERVICE_NAME }}:latest
+          region: ${{ secrets.GCP_REGION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          # 必要に応じて他のオプションを追加 (例: --allow-unauthenticated, --memory, etc.)
+          # flags: '--allow-unauthenticated'
+
+  deploy-frontend:
+    name: Deploy Frontend to Cloudflare Workers
+    needs: deploy-infra # インフラデプロイ完了後に実行
+    runs-on: ubuntu-latest
+    # if: github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: ./web
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      # Cloudflare へのデプロイ
+      # secrets.CLOUDFLARE_API_TOKEN と secrets.CLOUDFLARE_ACCOUNT_ID が必要
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: 'web' # wrangler-action のコンテキストを web に設定
+          command: deploy # package.json の deploy スクリプトを実行 
