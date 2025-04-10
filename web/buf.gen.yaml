@@ -1,0 +1,22 @@
+# buf.gen.yaml v2
+version: v2
+plugins:
+  # @bufbuild/protoc-gen-es プラグインの設定
+  # - plugin: buf.build/bufbuild/es
+  - local: protoc-gen-es # ローカルプラグイン名を指定
+    # TypeScript を生成するオプション
+    opt:
+      - target=ts # 複数のオプションはリスト形式で記述
+    # 出力先ディレクトリ (例: web/src/gen)
+    out: app/gen
+    include_imports: true # インポートされたファイルも生成対象に
+
+  # @connectrpc/protoc-gen-connect-es プラグインの設定
+  # - plugin: buf.build/connectrpc/es
+  - local: protoc-gen-connect-es # ローカルプラグイン名を指定
+    # TypeScript を生成するオプション
+    opt:
+      - target=ts
+    # 出力先ディレクトリ (同じく web/src/gen)
+    out: app/gen
+    include_imports: true # インポートされたファイルも生成対象に
