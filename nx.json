@@ -1,0 +1,14 @@
+{
+  "installation": {
+    "version": "20.7.2"
+  },
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "projects": {
+    "web": {
+      "root": "web"
+    },
+    "backend": {
+      "root": "backend"
+    }
+  }
+}

@@ -47,6 +47,7 @@
 
 ## 技術スタック（確定）
 
+*   **Monorepo Tool:** Nx (`^20.7.2`)
 *   **Backend:**
     *   Language: Golang (`go 1.24.0` 時点)
     *   API Framework: Connect RPC (`connectrpc.com/connect` v1.x 系)
@@ -96,8 +97,8 @@
 *   **CI (継続的インテグレーション):**
     *   トリガー: プルリクエスト時
     *   ジョブ:
-        *   Backend Lint (Go): `golangci-lint` による静的解析を実行します。
-        *   Frontend Lint (TS/React): Biome による静的解析・フォーマットチェックを実行します。
+        *   Backend Lint (Go): `./nx lint backend` を実行します。
+        *   Frontend Lint (TS/React): `./nx lint web` を実行します。
 *   **CD (継続的デプロイ):**
     *   トリガー: `main` ブランチへのプッシュ時 (CI成功後)
     *   ジョブ:
@@ -111,35 +112,44 @@
 *   Go (`1.21` 以上推奨)
 *   Protocol Buffer Compiler (`protoc`) - (例: `brew install protobuf`)
 *   `protoc-gen-go`, `protoc-gen-connect-go` (Go プラグイン) - (例: `go install google.golang.org/protobuf/cmd/protoc-gen-go@latest connectrpc.com/connect/cmd/protoc-gen-connect-go@latest`)
-*   Node.js (v20 以上推奨 by React Router template)
+*   Node.js (v20 以上推奨)
 *   bun (`curl -fsSL https://bun.sh/install | bash`)
-*   `buf` CLI (`bun add -d @bufbuild/buf`) - (web ディレクトリ内)
-*   Biome (`bun add -d --exact @biomejs/biome`) - (web ディレクトリ内)
+*   Nx (`./nx` コマンドを使用。依存関係はルート `package.json` を参照)
+*   (Frontend) `buf` CLI (`bun add -d @bufbuild/buf`) - (web ディレクトリ内)
+*   (Frontend) Biome (`bun add -d --exact @biomejs/biome`) - (web ディレクトリ内)
 
-### Backend
+### 依存関係のインストール
 
-1.  **初期化:** `backend` ディレクトリで `go mod init github.com/aiirononeko/kintore-app/backend`
-2.  **コード生成:** `backend` ディレクトリで `protoc --proto_path=proto --go_out=gen --go_opt=paths=source_relative --connect-go_out=gen --connect-go_opt=paths=source_relative proto/<service>/<version>/<file>.proto` (手動 or `go generate` 設定)
-3.  **依存関係:** `go mod tidy`
-4.  **サーバー起動 (開発時):** `backend` ディレクトリで `go run ./cmd/server/main.go` (またはビルドして実行)
-5.  **開発サーバー起動:** `web` ディレクトリで `bun run dev`
-6.  **Lint/Format:** `web` ディレクトリで `bun run lint` / `bun run format`
+プロジェクトルートで以下を実行します。
 
-### Frontend (Web)
+```bash
+bun install
+# (初回のみ、または backend/go.mod が変更された場合)
+cd backend && go mod tidy && cd ..
+```
 
-1.  **初期化:** プロジェクトルートで `bun create cloudflare@latest web -- --framework=react-router`
-2.  **依存関係追加:**
-    *   `cd web`
-    *   `bun add @connectrpc/connect@^1.6.0 @connectrpc/connect-web@^1.6.0 @bufbuild/protobuf@^1.6.0`
-    *   `bun add -d @bufbuild/buf @bufbuild/protoc-gen-es@^1.6.0 @connectrpc/protoc-gen-connect-es@^1.6.0`
-3.  **コード生成設定:** `web/buf.gen.yaml` を作成・編集。
-4.  **コード生成:** `web` ディレクトリで `bunx buf generate ../backend/proto` (後述の npm script 推奨)
-5.  **開発サーバー起動:** `web` ディレクトリで `bun run dev`
+### 主な開発コマンド (プロジェクトルートから実行)
+
+Nx を使用して、各プロジェクトのタスクを実行します。
+
+*   **Web フロントエンド:**
+    *   ビルド: `./nx build web`
+    *   開発サーバー起動: `./nx serve web`
+    *   Lint: `./nx lint web`
+    *   Format: `./nx format web`
+*   **Backend (Go):**
+    *   ビルド: `./nx build backend` (成果物は `./dist/backend_server`)
+    *   開発サーバー起動: `./nx serve backend`
+    *   テスト: `./nx test backend`
+    *   Lint: `./nx lint backend`
+*   **全プロジェクト:**
+    *   ビルド: `bun run build:all` (または `./nx run-many --target=build`)
+    *   Lint: `bun run lint:all` (または `./nx run-many --target=lint`)
 
 ### スキーマ変更時のワークフロー
 
 1.  `backend/proto/**/*.proto` ファイルを編集。
 2.  Backend コード生成: `backend` ディレクトリで `protoc ...` (または `go generate`)。
-3.  Frontend コード生成: `web` ディレクトリで `bunx buf generate ../backend/proto` (または `bun run generate:proto`)。
-4.  必要に応じて `go mod tidy` や `bun install` を実行。
+3.  Frontend コード生成: `web` ディレクトリで `bunx buf generate ../backend/proto`。
+4.  必要に応じてプロジェクトルートで `bun install` や `backend` ディレクトリで `go mod tidy` を実行。
 5.  各サーバー/クライアントのコードを修正。 

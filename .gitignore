@@ -11,3 +11,7 @@
 .wrangler
 .dev.vars*
 
+
+.nx/installation
+.nx/cache
+.nx/workspace-data

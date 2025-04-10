@@ -1,0 +1,15 @@
+{
+  "name": "kintore-app-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build:all": "nx run-many --target=build",
+    "lint:all": "nx run-many --target=lint",
+    "dev": "nx run-many --target=serve"
+  },
+  "devDependencies": {
+    "@nx-go/nx-go": "^3.3.1",
+    "@nx/vite": "^20.7.2",
+    "nx": "^20.7.2"
+  }
+}
