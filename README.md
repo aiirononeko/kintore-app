@@ -42,9 +42,8 @@
 4.  **データベース選定と実装:** バックエンドで使用するデータベース（例: PostgreSQL, Firestore）を決定し、API実装と連携させる。マイグレーションツールなども検討。
 5.  **フロントエンドUI構築:** トレーニング記録の入力フォーム、記録一覧、ボリューム表示などのUIコンポーネントをReactで作成する。
 6.  **認証:** ユーザー登録・ログイン機能を追加する (例: Firebase Authentication, Auth0 など)。
-7.  **状態管理 (フロントエンド):** 必要に応じて状態管理ライブラリ (例: Zustand, Jotai) を導入する。
-8.  **テスト:** バックエンド・フロントエンドの単体テスト、結合テストを整備する。
-9.  **CI/CD:** GitHub Actions などを用いて、テストとデプロイの自動化パイプラインを構築する。
+7.  **テスト:** バックエンド・フロントエンドの単体テスト、結合テストを整備する。
+8.  **CI/CD:** GitHub Actions などを用いて、テストとデプロイの自動化パイプラインを構築する。
 
 ## 技術スタック（確定）
 
@@ -59,6 +58,7 @@
     *   Deployment: Cloudflare Pages/Workers
     *   Styling: Tailwind CSS (`^4.0.0`)
     *   Package Manager: bun (`^1.2.9` 時点)
+    *   Linter/Formatter: Biome
     *   API Client: Connect RPC (`@connectrpc/connect`, `@connectrpc/connect-web` v1.x 系)
     *   Proto Runtime: `@bufbuild/protobuf` (v1.x 系)
     *   Proto Generation: `buf` CLI (`@bufbuild/buf`), `@bufbuild/protoc-gen-es`, `@connectrpc/protoc-gen-connect-es` (v1.x 系)
@@ -97,16 +97,12 @@
     *   トリガー: プルリクエスト時
     *   ジョブ:
         *   Backend Lint (Go): `golangci-lint` による静的解析を実行します。
-        *   Frontend Lint (TS/React): ESLint/Prettier などによる静的解析・フォーマットチェックを実行します。
+        *   Frontend Lint (TS/React): Biome による静的解析・フォーマットチェックを実行します。
 *   **CD (継続的デプロイ):**
     *   トリガー: `main` ブランチへのプッシュ時 (CI成功後)
     *   ジョブ:
         *   Deploy Backend: Dockerイメージをビルドし、Artifact Registry (または GCR) へプッシュ後、Cloud Run へデプロイします。Google Cloud への認証には Workload Identity Federation を使用します。
         *   Deploy Frontend: アプリケーションをビルドし、Cloudflare Workers/Pages へデプロイします。`wrangler` コマンド (Cloudflare Action) を使用します。
-
-## 貢献について
-
-(現時点では記載不要ですが、将来的に追記する可能性があります)
 
 ## セットアップと開発
 
@@ -118,6 +114,7 @@
 *   Node.js (v20 以上推奨 by React Router template)
 *   bun (`curl -fsSL https://bun.sh/install | bash`)
 *   `buf` CLI (`bun add -d @bufbuild/buf`) - (web ディレクトリ内)
+*   Biome (`bun add -d --exact @biomejs/biome`) - (web ディレクトリ内)
 
 ### Backend
 
@@ -125,6 +122,8 @@
 2.  **コード生成:** `backend` ディレクトリで `protoc --proto_path=proto --go_out=gen --go_opt=paths=source_relative --connect-go_out=gen --connect-go_opt=paths=source_relative proto/<service>/<version>/<file>.proto` (手動 or `go generate` 設定)
 3.  **依存関係:** `go mod tidy`
 4.  **サーバー起動 (開発時):** `backend` ディレクトリで `go run ./cmd/server/main.go` (またはビルドして実行)
+5.  **開発サーバー起動:** `web` ディレクトリで `bun run dev`
+6.  **Lint/Format:** `web` ディレクトリで `bun run lint` / `bun run format`
 
 ### Frontend (Web)
 
