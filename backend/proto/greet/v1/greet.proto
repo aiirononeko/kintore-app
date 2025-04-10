@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package greet.v1; // この .proto ファイルが属するパッケージ名を定義します。Goのパッケージ名とは異なります。
+
+option go_package = "github.com/aiirononeko/kintore-app/backend/gen/greet/v1;greetv1"; // 生成されるGoコードのパッケージパスとパッケージ名を指定します。
+
+// GreetService は挨拶機能を提供するサービスです。
+service GreetService {
+  // Greet はリクエストで受け取った名前に対して挨拶文を返すメソッドです。
+  rpc Greet(GreetRequest) returns (GreetResponse) {}
+}
+
+// GreetRequest は Greet メソッドへのリクエストメッセージです。
+message GreetRequest {
+  string name = 1; // 挨拶する相手の名前
+}
+
+// GreetResponse は Greet メソッドからのレスポンスメッセージです。
+message GreetResponse {
+  string greeting = 1; // 生成された挨拶文
+}

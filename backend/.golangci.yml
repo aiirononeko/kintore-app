@@ -1,0 +1,52 @@
+run:
+  # デフォルトのタイムアウトを延長 (必要に応じて)
+  # timeout: 5m
+
+linters-settings:
+  # 各リンターの詳細設定 (例)
+  govet:
+    check-shadowing: true
+  # errcheck:
+  #   check-type-assertions: true
+  #   check-blank: true
+  # staticcheck:
+  #   go: "1.21" # プロジェクトの Go バージョン
+
+linters:
+  # disable-all: true # 一旦すべて無効化してから個別に有効化する場合
+  enable:
+    # よく使われる推奨リンター群 (必要に応じて追加・削除)
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - revive # go-lint の後継
+    # - gofmt # フォーマットチェック (gofumpt の方が推奨される場合も)
+    # - goimports # インポート順のチェック
+    # - misspell # タイポチェック
+  # disable:
+  #   - some-linter # 特定のリンターを無効化する場合
+
+issues:
+  # エラーレベル以上の問題のみ報告 (info, warning レベルを無視)
+  # min-severity: error
+
+  # 特定のファイルやディレクトリを解析対象外にする
+  exclude-rules:
+    - path: _test\.go # テストファイルを除外する場合
+      linters:
+        - errcheck
+
+    # 自動生成されたコードを除外
+    - path: gen/ # backend/gen ディレクトリ全体を除外
+      linters:
+        - revive
+        - govet
+        # 他にも必要に応じて追加
+
+# 出力形式などの設定 (オプション)
+# output:
+#   format: colored-line-number
